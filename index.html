@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Game Topic Radar — Demo</title>
+<style>
+  :root { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { margin: 0; background: #0f1115; color: #e6e8eb; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 18px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #9aa0a6; font-size: 13px; margin: 0 0 24px; }
+  .card { background: #171a21; border: 1px solid #262b34; border-radius: 12px; padding: 18px; }
+  label { display: block; font-size: 13px; color: #9aa0a6; margin: 10px 0 4px; }
+  input { width: 100%; box-sizing: border-box; background: #0f1115; border: 1px solid #2a3038;
+          color: #e6e8eb; border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+  button { margin-top: 14px; background: #3b82f6; color: #fff; border: 0; border-radius: 8px;
+           padding: 10px 16px; font-size: 14px; cursor: pointer; }
+  button:disabled { opacity: .6; cursor: default; }
+  .row { display: flex; gap: 10px; }
+  .row input { flex: 1; } .row button { margin-top: 0; }
+  .err { color: #f87171; font-size: 13px; margin-top: 8px; }
+  .note { color: #9aa0a6; font-size: 12px; margin-top: 14px; line-height: 1.5; }
+  .vid { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid #262b34; }
+  .vid img { width: 120px; height: 68px; object-fit: cover; border-radius: 6px; flex: none; background:#222; }
+  .vid .t { font-size: 14px; margin: 0 0 4px; }
+  .vid .m { font-size: 12px; color: #9aa0a6; }
+  .vid a { color: #60a5fa; text-decoration: none; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Game Topic Radar — Demo</h1>
+  <p class="sub">Read-only demo of how this tool uses the YouTube Data API:
+     it searches public videos about a game and ranks them by view count
+     (real audience attention). It only reads public metadata — it never posts,
+     comments, votes, or accesses any private user data.</p>
+
+  <!-- Login -->
+  <div id="login" class="card">
+    <strong>Sign in (demo account)</strong>
+    <label>Username</label>
+    <input id="user" autocomplete="username" />
+    <label>Password</label>
+    <input id="pass" type="password" autocomplete="current-password" />
+    <button id="loginBtn">Sign in</button>
+    <div id="loginErr" class="err"></div>
+  </div>
+
+  <!-- App (after login) -->
+  <div id="app" class="card hidden">
+    <strong>Search a game</strong>
+    <div class="row" style="margin-top:10px">
+      <input id="q" value="The Legend of Zelda Ocarina of Time secrets" />
+      <button id="searchBtn">Search</button>
+    </div>
+    <div id="searchErr" class="err"></div>
+    <div id="results"></div>
+    <p class="note">Each result is a public YouTube video, fetched live via
+      <code>youtube/v3/search</code> + <code>youtube/v3/videos</code> (read-only),
+      ordered by view count. High view count = a topic real audiences watch.
+      The API key is stored server-side only and is never exposed to the browser.</p>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function login() {
+  $("loginErr").textContent = "";
+  $("loginBtn").disabled = true;
+  try {
+    const r = await fetch("/api/login", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: $("user").value, pass: $("pass").value }),
+    });
+    if (!r.ok) { $("loginErr").textContent = "Wrong username or password."; return; }
+    $("login").classList.add("hidden");
+    $("app").classList.remove("hidden");
+  } catch { $("loginErr").textContent = "Network error."; }
+  finally { $("loginBtn").disabled = false; }
+}
+
+async function search() {
+  $("searchErr").textContent = "";
+  $("results").innerHTML = "";
+  $("searchBtn").disabled = true;
+  try {
+    const r = await fetch("/api/search?q=" + encodeURIComponent($("q").value));
+    if (r.status === 401) { $("searchErr").textContent = "Please sign in again."; return; }
+    if (!r.ok) { $("searchErr").textContent = "Search failed (" + r.status + ")."; return; }
+    const vids = await r.json();
+    if (!vids.length) { $("results").innerHTML = "<p class='note'>No results.</p>"; return; }
+    $("results").innerHTML = vids.map((v) => `
+      <div class="vid">
+        <img src="${v.thumb}" alt="" />
+        <div>
+          <p class="t"><a href="${v.url}" target="_blank" rel="noreferrer">${escapeHtml(v.title)}</a></p>
+          <p class="m">${Number(v.views).toLocaleString()} views · ${escapeHtml(v.channel)}</p>
+        </div>
+      </div>`).join("");
+  } catch { $("searchErr").textContent = "Network error."; }
+  finally { $("searchBtn").disabled = false; }
+}
+
+function escapeHtml(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+$("loginBtn").onclick = login;
+$("searchBtn").onclick = search;
+$("pass").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
+</script>
+</body>
+</html>

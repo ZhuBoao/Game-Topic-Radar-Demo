@@ -1,0 +1,6 @@
+{
+  "name": "gtr-demo",
+  "private": true,
+  "type": "module",
+  "description": "Read-only YouTube Data API demo for Game Topic Radar (for API review)."
+}
